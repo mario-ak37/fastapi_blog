@@ -1,9 +1,13 @@
+from pprint import pprint
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from schemas import PostCreate, PostResponse
 
 app = FastAPI()
 
@@ -95,17 +99,35 @@ def post_page(request: Request, post_id: int):
 
 
 # API endpoints
-@app.get("/api/posts")
+@app.get("/api/posts", response_model=dict[str, list[PostResponse]])
 def get_posts():
     return {"posts": posts}
 
 
-@app.get("/api/posts/{post_id}")
+@app.get("/api/posts/{post_id}", response_model=PostResponse)
 def get_post(post_id: int):
     for post in posts:
         if post["id"] == post_id:
             return post
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+
+
+# create post api
+@app.post(
+    "/api/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED
+)
+def create_post(post: PostCreate):
+    new_id = max(p["id"] for p in posts) + 1 if posts else 1
+    new_post = {
+        "id": new_id,
+        "author": post.author,
+        "title": post.title,
+        "content": post.content,
+        "date_posted": "April 23, 2025",
+    }
+    posts.append(new_post)
+    pprint(posts)
+    return new_post
 
 
 # HANDLING EXCEPTIONS
