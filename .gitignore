@@ -11,3 +11,6 @@ wheels/
 
 # Local notes
 snippets.txt
+
+# Local database
+blog.db
