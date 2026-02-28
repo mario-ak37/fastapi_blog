@@ -33,6 +33,7 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 templates = Jinja2Templates(directory="templates")
 
 
+# Web routes
 # Show the homepage with all posts.
 @app.get("/", include_in_schema=False, name="home")
 @app.get("/posts", name="posts", include_in_schema=False)
@@ -46,7 +47,9 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
 
 # Show one post page by post ID.
 @app.get("/posts/{post_id}", include_in_schema=False)
-def post_page(request: Request, post_id: int, db: Annotated[Session, Depends(get_db)]):
+def post_page(
+    request: Request, post_id: int, db: Annotated[Session, Depends(get_db)]
+):
     result = db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalars().first()
 
@@ -90,6 +93,7 @@ def user_posts_page(
     )
 
 
+# User API routes
 # Create a new user.
 @app.post(
     "/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
@@ -147,6 +151,7 @@ def get_user_posts(user_id: int, db: Annotated[Session, Depends(get_db)]):
     return posts
 
 
+# Update part of one user by user ID.
 @app.patch("/api/users/{user_id}", response_model=UserResponse)
 def update_user_partial(
     user_id: int, user_update: UserUpdate, db: Annotated[Session, Depends(get_db)]
@@ -193,6 +198,32 @@ def update_user_partial(
     db.refresh(user)
 
     return user
+
+
+# Post API routes
+# Create a new post.
+@app.post(
+    "/api/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED
+)
+def create_post(post: PostCreate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.User).where(models.User.id == post.user_id))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
+        )
+
+    new_post = models.Post(
+        title=post.title,
+        content=post.content,
+        user_id=post.user_id,
+    )
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+
+    return new_post
 
 
 # Get all posts.
@@ -291,35 +322,12 @@ def delete_post(post_id: int, db: Annotated[Session, Depends(get_db)]):
     db.commit()
 
 
-# Create a new post.
-@app.post(
-    "/api/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED
-)
-def create_post(post: PostCreate, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(models.User).where(models.User.id == post.user_id))
-    user = result.scalars().first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
-        )
-
-    new_post = models.Post(
-        title=post.title,
-        content=post.content,
-        user_id=post.user_id,
-    )
-    db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
-
-    return new_post
-
-
-# HANDLING EXCEPTIONS
-# StarletteHTTPException Handler
+# Error handlers
+# Handle HTTP exceptions for web pages and API routes.
 @app.exception_handler(StarletteHTTPException)
-def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
+def general_http_exception_handler(
+    request: Request, exception: StarletteHTTPException
+):
     message = (
         exception.detail
         if exception.detail
@@ -343,9 +351,11 @@ def general_http_exception_handler(request: Request, exception: StarletteHTTPExc
     )
 
 
-# RequestValidationError Handler
+# Handle request validation errors for web pages and API routes.
 @app.exception_handler(RequestValidationError)
-def validation_exception_handler(request: Request, exception: RequestValidationError):
+def validation_exception_handler(
+    request: Request, exception: RequestValidationError
+):
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
