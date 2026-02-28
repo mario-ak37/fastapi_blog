@@ -1,5 +1,7 @@
+from datetime import UTC
 from pprint import pprint
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -53,10 +55,15 @@ def post_page(request: Request, post_id: int, db: Annotated[Session, Depends(get
             status_code=status.HTTP_404_NOT_FOUND, detail="Post not found."
         )
 
+    utc_dt = post.date_posted
+    if utc_dt.tzinfo is None:
+        utc_dt = utc_dt.replace(tzinfo=UTC)
+    local_dt = utc_dt.astimezone(ZoneInfo("Africa/Nairobi"))
+
     return templates.TemplateResponse(
         request=request,
         name="post.html",
-        context={"post": post, "title": post.title[:50]},
+        context={"post": post, "title": post.title[:50], "local_dt": local_dt},
     )
 
 

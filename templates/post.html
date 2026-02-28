@@ -11,7 +11,7 @@
       <div class="flex-grow-1">
         <div class="article-metadata mb-2">
           <a class="me-2" href="{{ url_for('user_posts', user_id=post.user_id) }}">{{ post.author.username }}</a>
-          <small class="text-body-secondary">{{ post.date_posted.strftime("%B %d, %Y at %I:%M %p") }}</small>
+          <small class="text-body-secondary">{{ local_dt.strftime("%B %d, %Y at %I:%M %p") }} - EAT</small>
         </div>
         <h2 class="article-title">{{ post.title }}</h2>
         <p class="article-content">{{ post.content }}</p>
