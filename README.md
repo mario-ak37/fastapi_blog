@@ -1,33 +1,41 @@
 # fastapi-blog
 
-A simple blog backend built with FastAPI.
+FastAPI blog app with a JSON API and server-rendered pages.
 
-## Overview
-- REST-style API for blog content
+## What It Does
+- Create, update, and delete users
+- Create, update, and delete blog posts
+- Render web pages for posts using Jinja templates
 
-## Requirements
-- Python 3.14+
-- `fastapi[standard]`
+## Tech Stack
+- Python
+- FastAPI
+- SQLAlchemy
+- Jinja2
+- SQLite
 
-## Install
-Using `uv`:
+## Run Locally
+
+### Option 1: `uv` (recommended)
 ```bash
 uv sync
-```
-
-Using `pip`:
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install "fastapi[standard]"
-```
-
-## Run
-```bash
 uv run fastapi dev
 ```
 
-Open `http://127.0.0.1:8000/` to verify the app is running.
+### Option 2: `pip`
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install "fastapi[standard]" sqlalchemy jinja2
+fastapi dev
+```
+
+App: `http://127.0.0.1:8000`  
+API docs: `http://127.0.0.1:8000/docs`
+
+## Main Endpoints
+- `/api/users`
+- `/api/posts`
 
 ## License
 Unlicensed
