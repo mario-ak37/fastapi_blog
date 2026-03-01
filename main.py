@@ -47,9 +47,7 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
 
 # Show one post page by post ID.
 @app.get("/posts/{post_id}", include_in_schema=False)
-def post_page(
-    request: Request, post_id: int, db: Annotated[Session, Depends(get_db)]
-):
+def post_page(request: Request, post_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalars().first()
 
@@ -200,6 +198,21 @@ def update_user_partial(
     return user
 
 
+# Delete a user by ID.
+@app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.User).where(models.User.id == user_id))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
+        )
+
+    db.delete(user)
+    db.commit()
+
+
 # Post API routes
 # Create a new post.
 @app.post(
@@ -325,9 +338,7 @@ def delete_post(post_id: int, db: Annotated[Session, Depends(get_db)]):
 # Error handlers
 # Handle HTTP exceptions for web pages and API routes.
 @app.exception_handler(StarletteHTTPException)
-def general_http_exception_handler(
-    request: Request, exception: StarletteHTTPException
-):
+def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
     message = (
         exception.detail
         if exception.detail
@@ -353,9 +364,7 @@ def general_http_exception_handler(
 
 # Handle request validation errors for web pages and API routes.
 @app.exception_handler(RequestValidationError)
-def validation_exception_handler(
-    request: Request, exception: RequestValidationError
-):
+def validation_exception_handler(request: Request, exception: RequestValidationError):
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
