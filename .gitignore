@@ -14,3 +14,6 @@ snippets.txt
 
 # Local database
 blog.db
+
+# User-uploaded media
+media/
