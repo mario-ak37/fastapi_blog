@@ -52,3 +52,6 @@ class Post(Base):
     )
 
     author: Mapped[User] = relationship(back_populates="posts")
+
+    # def __str__(self):
+    #     return self.title
