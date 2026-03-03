@@ -14,9 +14,7 @@ router = APIRouter()
 
 # Post API routes
 # Create a new post.
-@router.post(
-    "/api/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
 async def create_post(post: PostCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == post.user_id))
     user = result.scalars().first()
@@ -39,7 +37,7 @@ async def create_post(post: PostCreate, db: Annotated[AsyncSession, Depends(get_
 
 
 # Get all posts.
-@router.get("/api/posts", response_model=list[PostResponse])
+@router.get("", response_model=list[PostResponse])
 async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(models.Post).options(selectinload(models.Post.author))
@@ -49,7 +47,7 @@ async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 # Get one post by post ID.
-@router.get("/api/posts/{post_id}", response_model=PostResponse)
+@router.get("/{post_id}", response_model=PostResponse)
 async def get_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(models.Post)
@@ -66,7 +64,7 @@ async def get_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 # Replace one post by post ID.
-@router.put("/api/posts/{post_id}", response_model=PostResponse)
+@router.put("/{post_id}", response_model=PostResponse)
 async def update_post_full(
     post_id: int, post_data: PostCreate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -105,7 +103,7 @@ async def update_post_full(
 
 
 # Update part of one post by post ID.
-@router.patch("/api/posts/{post_id}", response_model=PostResponse)
+@router.patch("/{post_id}", response_model=PostResponse)
 async def update_post_partial(
     post_id: int, post_data: PostUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -134,7 +132,7 @@ async def update_post_partial(
 
 
 # Delete one post by post ID.
-@router.delete("/api/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalars().first()

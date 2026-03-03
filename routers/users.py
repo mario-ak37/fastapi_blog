@@ -7,16 +7,14 @@ from sqlalchemy.orm import selectinload
 
 import models
 from database import get_db
-from schemas import UserCreate, UserResponse, UserUpdate
+from schemas import PostResponse, UserCreate, UserResponse, UserUpdate
 
 router = APIRouter()
 
 
 # User API routes
 # Create a new user.
-@router.post(
-    "/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(models.User).where(models.User.username == user.username)
@@ -46,7 +44,7 @@ async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_
 
 
 # Get one user by user ID.
-@router.get("/api/users{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
@@ -59,7 +57,7 @@ async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 # Get all posts for one user.
-@router.get("/api/users/{user_id}/posts", response_model=list[UserResponse])
+@router.get("/{user_id}/posts", response_model=list[PostResponse])
 async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
@@ -77,7 +75,7 @@ async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_d
 
 
 # Update part of one user by user ID.
-@router.patch("/api/users/{user_id}", response_model=UserResponse)
+@router.patch("/{user_id}", response_model=UserResponse)
 async def update_user_partial(
     user_id: int, user_update: UserUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
@@ -126,7 +124,7 @@ async def update_user_partial(
 
 
 # Delete a user by ID.
-@router.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
