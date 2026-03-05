@@ -1,23 +1,35 @@
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import models
+from auth import (
+    create_access_token,
+    hash_password,
+    oauth2_scheme,
+    verify_access_token,
+    verify_password,
+)
+from config import settings
 from database import get_db
-from schemas import PostResponse, UserCreate, UserResponse, UserUpdate
+from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
 
 router = APIRouter()
 
 
 # User API routes
 # Create a new user.
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
-        select(models.User).where(models.User.username == user.username)
+        select(models.User).where(
+            func.lower(models.User.username) == user.username.lower()
+        )
     )
     existing_user = result.scalars().first()
 
@@ -26,7 +38,7 @@ async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists."
         )
     result = await db.execute(
-        select(models.User).where(models.User.email == user.email)
+        select(models.User).where(func.lower(models.User.email) == user.email.lower())
     )
     existing_email = result.scalars().all()
 
@@ -44,7 +56,7 @@ async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_
 
 
 # Get one user by user ID.
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserPrivate)
 async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
@@ -76,7 +88,7 @@ async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_d
 
 
 # Update part of one user by user ID.
-@router.patch("/{user_id}", response_model=UserResponse)
+@router.patch("/{user_id}", response_model=UserPrivate)
 async def update_user_partial(
     user_id: int, user_update: UserUpdate, db: Annotated[AsyncSession, Depends(get_db)]
 ):
