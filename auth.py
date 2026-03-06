@@ -13,15 +13,17 @@ password_hash = PasswordHash.recommended()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 
-# password hash function
+# Hash a plain-text password for storage.
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
+# Verify a plain-text password against a stored hash.
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
 
 
+# Create a signed JWT access token with an expiration time.
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
@@ -35,8 +37,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
+# Validate a JWT access token and return its user id subject.
 def verify_access_token(token: str) -> str | None:
-    """Verify a JWT access token and return the subject (user id) if valid."""
     try:
         payload = jwt.decode(
             token,
