@@ -23,7 +23,7 @@ class UserPublic(BaseModel):
 
 
 class UserPrivate(UserPublic):
-    Email: EmailStr
+    email: EmailStr
 
 
 class UserUpdate(BaseModel):
