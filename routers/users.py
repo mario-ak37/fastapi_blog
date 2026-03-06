@@ -46,7 +46,11 @@ async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists."
         )
-    new_user = models.User(username=user.username, email=user.email)
+    new_user = models.User(
+        username=user.username,
+        email=user.email.lower(),
+        password_hash=hash_password(user.password),
+    )
 
     db.add(new_user)
     await db.commit()
@@ -55,8 +59,80 @@ async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_
     return new_user
 
 
+# Log in with email and return an access token.
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    # look up user by email(case-insensitive)
+    # Note: OAuth2PasswordRequestForm uses 'username' field, but we treat it as email
+    result = await db.execute(
+        select(models.User).where(
+            func.lower(models.User.email) == form_data.username.lower()
+        )
+    )
+
+    user = result.scalars().first()
+
+    # verify that the user exists and the password is correct
+    # don't reveal which one failed, security best practice
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # create access token with user id as subject
+    access_token_expire = timedelta(minutes=settings.access_token_expire_minutes)
+    data = {"sub": str(user.id)}
+    access_token = create_access_token(data=data, expires_delta=access_token_expire)
+
+    return Token(access_token=access_token, token_type="bearer")
+
+
+# Get the currently authenticated user's profile.
+@router.get("/me", response_model=UserPrivate)
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get the currently authenticated user"""
+    user_id = verify_access_token(token=token)
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Validate user_id is a valid integer(defense againt malformed JWT)
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    result = await db.execute(select(models.User).where(models.User.id == user_id_int))
+
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
+
+
 # Get one user by user ID.
-@router.get("/{user_id}", response_model=UserPrivate)
+@router.get("/{user_id}", response_model=UserPublic)
 async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
@@ -101,7 +177,9 @@ async def update_user_partial(
         )
     if user_update.username is not None and user_update.username != user.username:
         result = await db.execute(
-            select(models.User).where(models.User.username == user_update.username)
+            select(models.User).where(
+                func.lower(models.User.username) == user_update.username.lower()
+            )
         )
 
         existing_user = result.scalars().first()
@@ -113,7 +191,9 @@ async def update_user_partial(
             )
     if user_update.email is not None and user_update.email != user.email:
         result = await db.execute(
-            select(models.User).where(models.User.email == user_update.email)
+            select(models.User).where(
+                func.lower(models.User.email) == user_update.email.lower()
+            )
         )
 
         existing_email = result.scalars().first()
@@ -128,6 +208,8 @@ async def update_user_partial(
 
     # loop through the dict of model_dump and use setattr to patch the updated fields
     for field, value in update_data.items():
+        if field == "email" and value is not None:
+            value = value.lower()
         setattr(user, field, value)
 
     await db.commit()
