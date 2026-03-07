@@ -8,13 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import models
-from auth import (
-    create_access_token,
-    hash_password,
-    oauth2_scheme,
-    verify_access_token,
-    verify_password,
-)
+from auth import CurrentUser, create_access_token, hash_password, verify_password
 from config import settings
 from database import get_db
 from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
@@ -94,41 +88,8 @@ async def login_for_access_token(
 
 # Get the currently authenticated user's profile.
 @router.get("/me", response_model=UserPrivate)
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Get the currently authenticated user"""
-    user_id = verify_access_token(token=token)
-
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Validate user_id is a valid integer(defense againt malformed JWT)
-    try:
-        user_id_int = int(user_id)
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    result = await db.execute(select(models.User).where(models.User.id == user_id_int))
-
-    user = result.scalars().first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
+async def get_current_user(current_user: CurrentUser):
+    return current_user
 
 
 # Get one user by user ID.
@@ -165,9 +126,18 @@ async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_d
 
 # Update part of one user by user ID.
 @router.patch("/{user_id}", response_model=UserPrivate)
-async def update_user_partial(
-    user_id: int, user_update: UserUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+async def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to edit this user!",
+        )
+
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
 
@@ -175,6 +145,7 @@ async def update_user_partial(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
         )
+
     if user_update.username is not None and user_update.username != user.username:
         result = await db.execute(
             select(models.User).where(
@@ -189,6 +160,7 @@ async def update_user_partial(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already exists.",
             )
+
     if user_update.email is not None and user_update.email != user.email:
         result = await db.execute(
             select(models.User).where(
@@ -204,12 +176,10 @@ async def update_user_partial(
                 detail="Email already in use.",
             )
 
-    update_data = user_update.model_dump(exclude_unset=True)
+    update_data = user_update.model_dump(exclude_unset=True, exclude_none=True)
 
     # loop through the dict of model_dump and use setattr to patch the updated fields
     for field, value in update_data.items():
-        if field == "email" and value is not None:
-            value = value.lower()
         setattr(user, field, value)
 
     await db.commit()
@@ -220,7 +190,17 @@ async def update_user_partial(
 
 # Delete a user by ID.
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+async def delete_user(
+    user_id: int,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this user!",
+        )
+
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
 

@@ -132,6 +132,13 @@ async def register_page(request: Request):
     )
 
 
+@app.get("/account", include_in_schema=False, name="account_page")
+async def account_page(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="account.html", context={"title": "Account"}
+    )
+
+
 # Error handlers
 # Handle HTTP exceptions for web pages and API routes.
 @app.exception_handler(StarletteHTTPException)
